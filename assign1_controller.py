@@ -7,10 +7,25 @@
 from evoman.controller import Controller
 import numpy as np
 import random
+import ast
 
-def sigmoid_activation(x):
-    return 1./(1.+np.exp(-x))
+population_cache = {}
 
+def get_population_data(file_path):
+    # TODO: refresh the cache when we modify the population
+    if file_path in population_cache:
+        # if data is already cached, return it
+        return population_cache[file_path]
+
+    # read the population data from the file
+    with open(file_path, "r") as file:
+        lines = file.readlines()
+
+    # parse and cache the population data
+    population_data = [ast.literal_eval(line.strip()) for line in lines]
+    population_cache[file_path] = population_data
+
+    return population_data
 
 # implements controller structure for player
 class player_controller(Controller):
@@ -18,17 +33,27 @@ class player_controller(Controller):
         self.n_hidden = [_n_hidden]
 
     def control(self, inputs, controller):
-            
-        # takes decisions about sprite actions
 
-        left = random.randint(0, 1)
-        right = random.randint(0, 1)
-        jump = random.randint(0, 1)
-        shoot = random.randint(0, 1)
-        release = random.randint(0, 1)
-        
-        print()
+        # i want to read what to do based on our population file. so first i will read it :)
+        population = get_population_data("population.txt")
 
-        return [left, right, jump, shoot, release]
+        # then i want to read what pop we are currently interested in
+        with open("pop.txt", "r") as file:
+            pop = int(file.read().strip())
+
+        # finally, i need to know which "move" i should be performing, which is located inside the pop.
+        # to know which move, i again need to read from a file
+        with open("move.txt", "r+") as file:
+            move_index = int(file.read().strip())
+
+            # and then update the file for the next move
+            file.seek(0)
+            next_move = move_index + 1
+            file.write(str(next_move))
+
+        # now i can return which move to do!
+        move = population[pop][move_index]
+
+        return move
 
 
