@@ -14,8 +14,11 @@ population_cache = {}
 def get_population_data(file_path):
     # TODO: refresh the cache when we modify the population
     if file_path in population_cache:
-        # if data is already cached, return it
-        return population_cache[file_path]
+        with open("refresh.txt", "r") as file:
+            refresh = int(file.read().strip())
+            if refresh == 0:
+                # if data is already cached, return it
+                return population_cache[file_path]
 
     # read the population data from the file
     with open(file_path, "r") as file:
@@ -24,6 +27,9 @@ def get_population_data(file_path):
     # parse and cache the population data
     population_data = [ast.literal_eval(line.strip()) for line in lines]
     population_cache[file_path] = population_data
+
+    with open("refresh.txt", "w") as file:
+        file.write(str(0))
 
     return population_data
 
