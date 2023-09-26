@@ -41,7 +41,10 @@ class player_controller(Controller):
     def control(self, inputs, controller):
 
         # i want to read what to do based on our population file. so first i will read it :)
-        population = get_population_data("population.txt")
+        with open ("enemy_and_experiment.txt", "r") as file:
+            enemy_and_experiment = str(file.read().strip())
+
+        population = get_population_data("population_" + str(enemy_and_experiment) + ".txt")
 
         # then i want to read what pop we are currently interested in
         with open("pop.txt", "r") as file:

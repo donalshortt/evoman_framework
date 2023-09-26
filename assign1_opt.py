@@ -32,8 +32,10 @@ env = Environment(experiment_name=experiment_name,
 				  level=2,
 				  visuals=False)
 
-generations = 50
+generations = 100
 population_size = 100
+
+# run the program 10* 3 times 
 
 def mate_pops(fitnesses, population):
     
@@ -92,12 +94,22 @@ def print_stats(fitnesses, gains):
     print("Average fitness: " + str(average_fitness))
     print("Average gain: " + str(average_gain))
 
-env.update_parameter('enemies', [1])
+def generate_subarray():
+    return [random.choice([1, 0]) for _ in range(5)]
 
-# generate the initial population of random pops 
-if not os.path.exists("population.txt"):
-    print("Initial population not found, generating initial population")
-    subprocess.run(["python", "gen_init_pop.py"], check=True)
+def generate_main_array():
+    return [generate_subarray() for _ in range(3000)]
+
+def gen_population(population_file_name):
+    arrays = [generate_main_array() for _ in range(100)]
+    
+    with open(population_file_name, "w") as file:
+        for array in arrays:
+            # Use json.dumps to create a clear, readable format
+            file.write(json.dumps(array))
+            file.write("\n")  # newline after each array
+
+env.update_parameter('enemies', [1])
 
 # you will notice im using files as variables in some cases, this is due to limitations of the framework (or my own stupidity)
 if not os.path.exists("move.txt"):
@@ -110,71 +122,97 @@ if not os.path.exists("refresh.txt"):
     with open("refresh.txt", "w") as file:
         file.write(str(1))
 
+
 print("\n\n<!> Starting Training <!>\n\n")
 
-for gen in range (generations):
-    fitnesses = []
-    gains = []
+for enemy in range (3):
+    for experiment in range (10):
+        # i want to have a new text file generated: results + exp number + enemy name
+        experiment_results = "results_" + str(enemy) + "_" + str(experiment) + ".txt"
+        population_file = "population_" + str(enemy) + "_" + str(experiment) + ".txt"
 
-    # make sure to tell the controller to refresh its cache
-    with open("refresh.txt", "w") as file:
-        file.write(str(1))
+        with open("enemy_and_experiment.txt", "w") as file:
+            file.write(str(enemy) + "_" + str(experiment))
 
-    for pop in range(population_size):
-        # i need to tell the control function what pop we are currently on via a file
-        with open("pop.txt", "w") as file:
-            file.write(str(pop))
-        
-        fitness, player_life, enemy_life, game_time = env.play()
-        fitnesses.append([fitness, pop])
-        gains.append(player_life - enemy_life)
+        gen_population(population_file)
 
-        # i need to make sure to set move.txt to 0 at the end of each game run
-        with open("move.txt", "w") as file:
-            file.write(str(0))
+        for gen in range (generations):
+            fitnesses = []
+            gains = []
 
-    
-    sorted_fitnesses = sorted(fitnesses, key = lambda x: x[0])
+            # make sure to tell the controller to refresh its cache
+            with open("refresh.txt", "w") as file:
+                file.write(str(1))
 
-    print_stats(sorted_fitnesses, gains)
+            for pop in range(population_size):
+                # i need to tell the control function what pop we are currently on via a file
+                with open("pop.txt", "w") as file:
+                    file.write(str(pop))
+                
+                fitness, player_life, enemy_life, game_time = env.play()
+                fitnesses.append([fitness, pop])
+                gains.append(player_life - enemy_life)
+                    # include the fitness, the gain & the current generation
+                
 
-    # i need to make sure pop.txt is reset after each subsequent generation
-    with open("pop.txt", "w") as file:
-        file.write(str(0))
+                # i need to make sure to set move.txt to 0 at the end of each game run
+                with open("move.txt", "w") as file:
+                    file.write(str(0))
 
-    # find the top 50 pops and cull the rest
-    # have them pair off to produce 25 children, and then make mutated copies of 25 random chads
+            
+            sorted_fitnesses = sorted(fitnesses, key = lambda x: x[0])
+            sorted_gains = sorted(gains)
 
-    # send the rest to a farm upstate
-    fittest = sorted_fitnesses[50:100]
-   
-    with open("population.txt", "r") as file:
-        lines = file.readlines()
+            print_stats(sorted_fitnesses, gains)
 
-    population_data = [ast.literal_eval(line.strip()) for line in lines]
+            # i need to make sure pop.txt is reset after each subsequent generation
+            with open("pop.txt", "w") as file:
+                file.write(str(0))
 
-    fittest_population = find_fittest_population(fittest, population_data)
-    children = mate_pops(fittest, population_data)
-    mutated_population = mutate_pops(fittest_population)
+            # find the top 50 pops and cull the rest
+            # have them pair off to produce 25 children, and then make mutated copies of 25 random chads
 
-    final_population = fittest_population + children + mutated_population
-    final_population_list = list(final_population)
+            # send the rest to a farm upstate
+            fittest = sorted_fitnesses[50:100]
+           
+            with open(population_file, "r") as file:
+                lines = file.readlines()
 
-    # now i want to write the new population into the population file
-    with open("population.txt", "w") as file:
-       # for pop in final_population_list:
-       #     print(type(pop))
-       #     file.write(json.dumps(pop))
-       #     file.write("\n")
+            population_data = [ast.literal_eval(line.strip()) for line in lines]
+
+            fittest_population = find_fittest_population(fittest, population_data)
+            children = mate_pops(fittest, population_data)
+            mutated_population = mutate_pops(fittest_population)
+
+            final_population = fittest_population + children + mutated_population
+            final_population_list = list(final_population)
+
+            # now i want to write the new population into the population file
+            with open(population_file, "w") as file:
+                for pop in final_population_list:
+                    try:
+                        file.write(json.dumps(pop))
+                        file.write("\n")
+                    except TypeError:
+                        print(f"Failed to serialize: {pop}")
+
+            # save results!
+            
+            
+            first_values = list(map(lambda subarray: subarray[0] if subarray else None, sorted_fitnesses))
+            valid_values = [value for value in first_values if value is not None]
+            average_fitness = sum(valid_values) / len(valid_values)
+            average_gain = sum(gains) / len(gains)
+
+            with open(experiment_results, "a") as file:
+                file.write(
+                        str(sorted_fitnesses[99][0]) + " " + 
+                        str(sorted_fitnesses[0][0]) + " " + 
+                        str(average_fitness) + " " + 
+                        str(sorted_gains[99]) + " " + 
+                        str(sorted_gains[0]) + " " + 
+                        str(average_gain) + "\n"
+                        )
 
 
-
-        for pop in final_population_list:
-            try:
-                file.write(json.dumps(pop))
-                file.write("\n")
-            except TypeError:
-                print(f"Failed to serialize: {pop}")
-                #check_types(pop)
-
-    print("\n\n<!> New Generation <!>\n\n")
+            print("\n\n<!> New Generation <!>\n\n")
