@@ -1,0 +1,2 @@
+avg_player_energy, avg_enemy_energy
+85.00000000000014, 0.0
